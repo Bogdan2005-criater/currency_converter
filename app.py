@@ -23,7 +23,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Функция для обновления курсов валют в базе данных
 def update_exchange_rates():
     try:
         response = requests.get(API_URL)
@@ -34,7 +33,7 @@ def update_exchange_rates():
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM rates")  # Очистка старых данных
+        cursor.execute("DELETE FROM rates") 
 
         for currency, rate in rates.items():
             cursor.execute("INSERT INTO rates (currency, rate, updated_at) VALUES (?, ?, ?)",
@@ -46,13 +45,11 @@ def update_exchange_rates():
     except Exception as e:
         print(f"Ошибка обновления курсов: {e}")
 
-# Функция для автоматического обновления каждые 5 минут
 def schedule_rate_updates():
     while True:
         update_exchange_rates()
-        time.sleep(300)  # Ждём 5 минут перед следующим обновлением
+        time.sleep(300)  
 
-# Функция для получения сохранённых валют из базы данных
 def get_saved_currencies():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -61,7 +58,6 @@ def get_saved_currencies():
     conn.close()
     return currencies
 
-# Функция для конвертации валют с использованием сохранённых данных в БД
 def convert_currency(from_currency, to_currency, amount):
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -105,7 +101,6 @@ def convert():
 
 if __name__ == '__main__':
     init_db()
-    # Запуск второго потока для обновления курсов
     update_thread = threading.Thread(target=schedule_rate_updates)
     update_thread.daemon = True  # Устанавливаем поток как демона, чтобы он завершился при завершении основного потока
     update_thread.start()
