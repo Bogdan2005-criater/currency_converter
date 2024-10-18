@@ -1,3 +1,6 @@
+import threading
+import time
+
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 import requests
@@ -5,7 +8,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-API_URL = "https://api.exchangeratesapi.io/latest?base=USD"
+API_URL = "https://api.exchangeratesapi.io/v1/latest?access_key=cd654fc7272b76520459442c784d15c7"
 DATABASE = 'db.sqlite'
 
 def init_db():
@@ -20,44 +23,57 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Функция для обновления курсов валют в базе данных
 def update_exchange_rates():
-    response = requests.get(API_URL)
-    data = response.json()
-    rates = data.get('rates', {})
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
+    try:
+        response = requests.get(API_URL)
+        data = response.json()
+        rates = data.get('rates', {})
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM rates")  # Очистка старых данных
+
+        for currency, rate in rates.items():
+            cursor.execute("INSERT INTO rates (currency, rate, updated_at) VALUES (?, ?, ?)",
+                           (currency, rate, timestamp))
+
+        conn.commit()
+        conn.close()
+        print(f"Курсы валют обновлены в {timestamp}")
+    except Exception as e:
+        print(f"Ошибка обновления курсов: {e}")
+
+# Функция для автоматического обновления каждые 5 минут
+def schedule_rate_updates():
+    while True:
+        update_exchange_rates()
+        time.sleep(300)  # Ждём 5 минут перед следующим обновлением
+
+# Функция для получения сохранённых валют из базы данных
+def get_saved_currencies():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM rates")
-    
-    for currency, rate in rates.items():
-        cursor.execute("INSERT INTO rates (currency, rate, updated_at) VALUES (?, ?, ?)",
-                       (currency, rate, timestamp))
-    
-    conn.commit()
+    cursor.execute("SELECT currency FROM rates")
+    currencies = [row[0] for row in cursor.fetchall()]
     conn.close()
+    return currencies
 
-def get_last_update():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT updated_at FROM rates LIMIT 1")
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else None
-
+# Функция для конвертации валют с использованием сохранённых данных в БД
 def convert_currency(from_currency, to_currency, amount):
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT rate FROM rates WHERE currency=?", (from_currency,))
     from_rate = cursor.fetchone()
-    
+
     cursor.execute("SELECT rate FROM rates WHERE currency=?", (to_currency,))
     to_rate = cursor.fetchone()
-    
+
     conn.close()
-    
+
     if from_rate and to_rate:
         converted_amount = amount * (to_rate[0] / from_rate[0])
         return round(converted_amount, 2)
@@ -66,17 +82,13 @@ def convert_currency(from_currency, to_currency, amount):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    currencies = get_saved_currencies()  # Получаем список валют для выпадающего списка
+    return render_template('index.html', currencies=currencies)
 
 @app.route('/update_rates', methods=['POST'])
 def update_rates():
     update_exchange_rates()
     return jsonify({'message': 'Курсы обновлены!'})
-
-@app.route('/last_update', methods=['GET'])
-def last_update():
-    last_update = get_last_update()
-    return jsonify({'last_update': last_update})
 
 @app.route('/convert', methods=['POST'])
 def convert():
@@ -84,7 +96,7 @@ def convert():
     from_currency = data['from_currency']
     to_currency = data['to_currency']
     amount = float(data['amount'])
-    
+
     result = convert_currency(from_currency, to_currency, amount)
     if result is not None:
         return jsonify({'converted_amount': result})
@@ -93,4 +105,9 @@ def convert():
 
 if __name__ == '__main__':
     init_db()
+    # Запуск второго потока для обновления курсов
+    update_thread = threading.Thread(target=schedule_rate_updates)
+    update_thread.daemon = True  # Устанавливаем поток как демона, чтобы он завершился при завершении основного потока
+    update_thread.start()
+
     app.run(debug=True)
