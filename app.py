@@ -102,7 +102,7 @@ def convert():
 if __name__ == '__main__':
     init_db()
     update_thread = threading.Thread(target=schedule_rate_updates)
-    update_thread.daemon = True  # Устанавливаем поток как демона, чтобы он завершился при завершении основного потока
+    update_thread.daemon = True 
     update_thread.start()
 
     app.run(debug=True)
