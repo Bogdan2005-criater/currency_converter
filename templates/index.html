@@ -15,11 +15,19 @@
     <form id="convertForm">
         <div class="form-group">
             <label for="from_currency">Из валюты:</label>
-            <input type="text" class="form-control" id="from_currency" required>
+            <select id="from_currency" class="form-control">
+                {% for currency in currencies %}
+                    <option value="{{ currency }}">{{ currency }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label for="to_currency">В валюту:</label>
-            <input type="text" class="form-control" id="to_currency" required>
+            <select id="to_currency" class="form-control">
+                {% for currency in currencies %}
+                    <option value="{{ currency }}">{{ currency }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label for="amount">Сумма:</label>
