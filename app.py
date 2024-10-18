@@ -78,7 +78,7 @@ def convert_currency(from_currency, to_currency, amount):
 
 @app.route('/')
 def index():
-    currencies = get_saved_currencies()  # Получаем список валют для выпадающего списка
+    currencies = get_saved_currencies() 
     return render_template('index.html', currencies=currencies)
 
 @app.route('/update_rates', methods=['POST'])
